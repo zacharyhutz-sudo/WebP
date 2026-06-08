@@ -1,4 +1,7 @@
 const fileInput = document.getElementById('fileInput');
+const folderInput = document.getElementById('folderInput');
+const chooseFilesButton = document.getElementById('chooseFilesButton');
+const chooseFolderButton = document.getElementById('chooseFolderButton');
 const dropZone = document.getElementById('dropZone');
 const qualityInput = document.getElementById('qualityInput');
 const qualityValue = document.getElementById('qualityValue');
@@ -12,16 +15,31 @@ const progressFill = document.getElementById('progressFill');
 const fileList = document.getElementById('fileList');
 const fileSummary = document.getElementById('fileSummary');
 
-let selectedFiles = [];
+let selectedItems = [];
 let isConverting = false;
 
 const supportedExtensions = ['.jpg', '.jpeg', '.heic', '.heif'];
+const supportedMimeTypes = ['image/jpeg', 'image/heic', 'image/heif'];
 
 qualityInput.addEventListener('input', () => {
   qualityValue.textContent = `${qualityInput.value}%`;
 });
 
-dropZone.addEventListener('click', () => fileInput.click());
+chooseFilesButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  fileInput.click();
+});
+
+chooseFolderButton.addEventListener('click', (event) => {
+  event.stopPropagation();
+  folderInput.click();
+});
+
+dropZone.addEventListener('click', (event) => {
+  if (event.target === chooseFilesButton || event.target === chooseFolderButton) return;
+  fileInput.click();
+});
+
 dropZone.addEventListener('keydown', (event) => {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault();
@@ -30,8 +48,15 @@ dropZone.addEventListener('keydown', (event) => {
 });
 
 fileInput.addEventListener('change', (event) => {
-  addFiles(Array.from(event.target.files || []));
+  const items = filesToItems(Array.from(event.target.files || []));
+  addItems(items, event.target.files?.length || 0);
   fileInput.value = '';
+});
+
+folderInput.addEventListener('change', (event) => {
+  const items = filesToItems(Array.from(event.target.files || []));
+  addItems(items, event.target.files?.length || 0);
+  folderInput.value = '';
 });
 
 ['dragenter', 'dragover'].forEach((eventName) => {
@@ -49,25 +74,32 @@ fileInput.addEventListener('change', (event) => {
 });
 
 dropZone.addEventListener('drop', async (event) => {
-  const files = await getFilesFromDataTransfer(event.dataTransfer);
-  addFiles(files);
+  const items = await getItemsFromDataTransfer(event.dataTransfer);
+  addItems(items, items.length);
 });
 
 clearButton.addEventListener('click', () => {
   if (isConverting) return;
-  selectedFiles = [];
+  selectedItems = [];
   renderFiles();
   setProgress('No files selected.', '', 0);
 });
 
 convertButton.addEventListener('click', async () => {
-  if (!selectedFiles.length || isConverting) return;
+  if (!selectedItems.length || isConverting) return;
   await convertAll();
 });
 
+function filesToItems(files) {
+  return files.map((file) => ({
+    file,
+    path: cleanPath(file.webkitRelativePath || file.name)
+  }));
+}
+
 function isSupportedFile(file) {
   const lowerName = file.name.toLowerCase();
-  return supportedExtensions.some((extension) => lowerName.endsWith(extension));
+  return supportedMimeTypes.includes(file.type) || supportedExtensions.some((extension) => lowerName.endsWith(extension));
 }
 
 function isHeicFile(file) {
@@ -75,72 +107,81 @@ function isHeicFile(file) {
   return lowerName.endsWith('.heic') || lowerName.endsWith('.heif') || file.type === 'image/heic' || file.type === 'image/heif';
 }
 
-function addFiles(files) {
-  const accepted = files.filter(isSupportedFile);
-  const existingKeys = new Set(selectedFiles.map((file) => `${file.webkitRelativePath || file.name}-${file.size}-${file.lastModified}`));
+function addItems(items, attemptedCount = items.length) {
+  const accepted = items.filter((item) => isSupportedFile(item.file));
+  const existingKeys = new Set(selectedItems.map(getItemKey));
+  let added = 0;
 
-  for (const file of accepted) {
-    const key = `${file.webkitRelativePath || file.name}-${file.size}-${file.lastModified}`;
+  for (const item of accepted) {
+    const key = getItemKey(item);
     if (!existingKeys.has(key)) {
-      selectedFiles.push(file);
+      selectedItems.push(item);
       existingKeys.add(key);
+      added += 1;
     }
   }
 
   renderFiles();
 
-  if (files.length && !accepted.length) {
+  const ignored = Math.max(0, attemptedCount - accepted.length);
+  if (attemptedCount && !accepted.length) {
     setProgress('No supported images found. Use HEIC, HEIF, JPG, or JPEG.', '', 0);
-  } else if (accepted.length) {
-    setProgress(`${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'} ready.`, '', 0);
+  } else if (added > 0) {
+    const ignoredText = ignored ? ` ${ignored} unsupported file${ignored === 1 ? '' : 's'} ignored.` : '';
+    setProgress(`${selectedItems.length} file${selectedItems.length === 1 ? '' : 's'} ready.${ignoredText}`, '', 0);
+  } else if (accepted.length > 0) {
+    setProgress('Those files were already added.', '', 0);
   }
 }
 
-async function getFilesFromDataTransfer(dataTransfer) {
-  const items = Array.from(dataTransfer.items || []);
-  const files = Array.from(dataTransfer.files || []);
+async function getItemsFromDataTransfer(dataTransfer) {
+  const dataItems = Array.from(dataTransfer.items || []);
+  const fallbackItems = filesToItems(Array.from(dataTransfer.files || []));
 
-  if (!items.length) return files;
+  if (!dataItems.length) return fallbackItems;
 
   const collected = [];
-  for (const item of items) {
-    const entry = item.webkitGetAsEntry?.();
+  for (const dataItem of dataItems) {
+    const entry = dataItem.webkitGetAsEntry?.();
     if (entry) {
-      const entryFiles = await readEntry(entry);
-      collected.push(...entryFiles);
-    } else if (item.kind === 'file') {
-      const file = item.getAsFile();
-      if (file) collected.push(file);
+      const entryItems = await readEntry(entry);
+      collected.push(...entryItems);
+    } else if (dataItem.kind === 'file') {
+      const file = dataItem.getAsFile();
+      if (file) collected.push({ file, path: cleanPath(file.webkitRelativePath || file.name) });
     }
   }
 
-  return collected.length ? collected : files;
+  return collected.length ? collected : fallbackItems;
 }
 
 function readEntry(entry) {
   return new Promise((resolve) => {
     if (entry.isFile) {
-      entry.file((file) => resolve([file]), () => resolve([]));
+      entry.file(
+        (file) => resolve([{ file, path: cleanPath(entry.fullPath || file.name) }]),
+        () => resolve([])
+      );
       return;
     }
 
     if (entry.isDirectory) {
       const reader = entry.createReader();
-      const allFiles = [];
+      const allItems = [];
 
       const readBatch = () => {
         reader.readEntries(async (entries) => {
           if (!entries.length) {
-            resolve(allFiles);
+            resolve(allItems);
             return;
           }
 
           for (const childEntry of entries) {
-            const childFiles = await readEntry(childEntry);
-            allFiles.push(...childFiles);
+            const childItems = await readEntry(childEntry);
+            allItems.push(...childItems);
           }
           readBatch();
-        }, () => resolve(allFiles));
+        }, () => resolve(allItems));
       };
 
       readBatch();
@@ -154,13 +195,14 @@ function readEntry(entry) {
 function renderFiles(statusMap = {}) {
   fileList.innerHTML = '';
 
-  for (const file of selectedFiles) {
-    const key = getFileKey(file);
-    const status = statusMap[key] || 'ready';
+  for (const item of selectedItems) {
+    const { file, path } = item;
+    const key = getItemKey(item);
+    const status = statusMap[key] || { label: 'Ready', className: 'ready' };
     const li = document.createElement('li');
     li.innerHTML = `
       <div>
-        <div class="file-name" title="${escapeHtml(file.webkitRelativePath || file.name)}">${escapeHtml(file.webkitRelativePath || file.name)}</div>
+        <div class="file-name" title="${escapeHtml(path)}">${escapeHtml(path)}</div>
         <div class="file-detail">${formatBytes(file.size)} • ${isHeicFile(file) ? 'HEIC/HEIF' : 'JPG/JPEG'}</div>
       </div>
       <span class="status ${status.className}">${status.label}</span>
@@ -168,12 +210,12 @@ function renderFiles(statusMap = {}) {
     fileList.appendChild(li);
   }
 
-  fileSummary.textContent = selectedFiles.length
-    ? `${selectedFiles.length} image${selectedFiles.length === 1 ? '' : 's'} selected.`
+  fileSummary.textContent = selectedItems.length
+    ? `${selectedItems.length} image${selectedItems.length === 1 ? '' : 's'} selected.`
     : 'Choose images to begin.';
 
-  convertButton.disabled = !selectedFiles.length || isConverting;
-  clearButton.disabled = !selectedFiles.length || isConverting;
+  convertButton.disabled = !selectedItems.length || isConverting;
+  clearButton.disabled = !selectedItems.length || isConverting;
 }
 
 async function convertAll() {
@@ -190,16 +232,17 @@ async function convertAll() {
   convertButton.disabled = true;
   clearButton.disabled = true;
 
-  for (let index = 0; index < selectedFiles.length; index++) {
-    const file = selectedFiles[index];
-    const key = getFileKey(file);
+  for (let index = 0; index < selectedItems.length; index++) {
+    const item = selectedItems[index];
+    const file = item.file;
+    const key = getItemKey(item);
     statusMap[key] = { label: 'Converting', className: 'working' };
     renderFiles(statusMap);
-    setProgress(`Converting ${file.name}`, `${index + 1} of ${selectedFiles.length}`, Math.round((index / selectedFiles.length) * 100));
+    setProgress(`Converting ${file.name}`, `${index + 1} of ${selectedItems.length}`, Math.round((index / selectedItems.length) * 100));
 
     try {
       const webpBlob = await convertFileToWebP(file, quality, maxWidth);
-      const outputPath = makeOutputPath(file, keepFolders, outputNames);
+      const outputPath = makeOutputPath(item, keepFolders, outputNames);
       zip.file(outputPath, webpBlob);
       successful += 1;
       statusMap[key] = { label: 'Done', className: 'done' };
@@ -210,7 +253,7 @@ async function convertAll() {
     }
 
     renderFiles(statusMap);
-    setProgress(`Processed ${index + 1} of ${selectedFiles.length}`, `${index + 1} of ${selectedFiles.length}`, Math.round(((index + 1) / selectedFiles.length) * 100));
+    setProgress(`Processed ${index + 1} of ${selectedItems.length}`, `${index + 1} of ${selectedItems.length}`, Math.round(((index + 1) / selectedItems.length) * 100));
   }
 
   if (successful > 0) {
@@ -298,9 +341,9 @@ function canvasToWebPBlob(canvas, quality) {
   });
 }
 
-function makeOutputPath(file, keepFolders, outputNames) {
-  const sourcePath = keepFolders && file.webkitRelativePath ? file.webkitRelativePath : file.name;
-  const withoutExtension = sourcePath.replace(/\.[^/.]+$/, '');
+function makeOutputPath(item, keepFolders, outputNames) {
+  const sourcePath = keepFolders && item.path ? item.path : item.file.name;
+  const withoutExtension = cleanPath(sourcePath).replace(/\.[^/.]+$/, '');
   let outputPath = `${withoutExtension}.webp`;
   let counter = 2;
 
@@ -313,8 +356,15 @@ function makeOutputPath(file, keepFolders, outputNames) {
   return outputPath;
 }
 
-function getFileKey(file) {
-  return `${file.webkitRelativePath || file.name}-${file.size}-${file.lastModified}`;
+function getItemKey(item) {
+  return `${item.path}-${item.file.size}-${item.file.lastModified}`;
+}
+
+function cleanPath(path) {
+  return String(path || '')
+    .replace(/^\/+/, '')
+    .replace(/\\/g, '/')
+    .replace(/\/+/g, '/');
 }
 
 function setProgress(text, count, percent) {
@@ -337,7 +387,7 @@ function downloadBlob(blob, filename) {
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
-  const sizeIndex = Math.floor(Math.log(bytes) / Math.log(1024));
+  const sizeIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   return `${(bytes / Math.pow(1024, sizeIndex)).toFixed(sizeIndex === 0 ? 0 : 1)} ${units[sizeIndex]}`;
 }
 
@@ -346,7 +396,7 @@ function formatDateForFilename(date) {
 }
 
 function escapeHtml(value) {
-  return value
+  return String(value)
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')

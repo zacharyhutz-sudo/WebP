@@ -18,9 +18,15 @@
     <section class="panel">
       <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Choose images or drag and drop images here">
         <div class="drop-icon">⬇</div>
-        <h2>Drop images here</h2>
-        <p>or click to choose files</p>
+        <h2>Drop images or folders here</h2>
+        <p>or choose a batch below</p>
+        <div class="picker-actions">
+          <button id="chooseFilesButton" type="button">Choose files</button>
+          <button id="chooseFolderButton" type="button">Choose folder</button>
+        </div>
+        <p class="mini-note">For files, use Shift, Command, or Ctrl to select many at once.</p>
         <input id="fileInput" type="file" multiple accept=".jpg,.jpeg,.heic,.heif,image/jpeg,image/heic,image/heif" />
+        <input id="folderInput" type="file" multiple webkitdirectory directory accept=".jpg,.jpeg,.heic,.heif,image/jpeg,image/heic,image/heif" />
       </div>
 
       <div class="settings">

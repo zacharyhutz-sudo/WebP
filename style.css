@@ -284,3 +284,40 @@ footer {
   .file-list li { grid-template-columns: 1fr; padding: 14px 18px; }
   .status { width: fit-content; }
 }
+
+.picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+  margin: 1rem 0 0.35rem;
+}
+
+.picker-actions button {
+  border: 1px solid rgba(27, 42, 35, 0.18);
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.picker-actions button:hover {
+  transform: translateY(-1px);
+}
+
+.mini-note {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-top: 0.35rem;
+}
+
+#folderInput {
+  display: none;
+}
+
+.status.ready {
+  background: rgba(27, 42, 35, 0.08);
+  color: var(--muted);
+}

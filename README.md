@@ -42,3 +42,8 @@ This site uses CDN-hosted browser libraries:
 - heic2any for decoding HEIC/HEIF files
 
 Because the tool is browser-based, very large batches can take time and may use a lot of memory. HEIC files are usually slower than JPG files.
+
+
+## Batch selection tip
+
+Use **Choose files** and select multiple photos with Shift, Command, or Ctrl. Use **Choose folder** when you want the app to scan an entire folder. Dragging a folder into the drop zone also works in Chromium-based browsers.
