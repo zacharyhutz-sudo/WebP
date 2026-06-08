@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bulk Image to WebP Converter</title>
+  <meta name="description" content="A simple browser-based HEIC/JPG to WebP bulk converter for GitHub Pages." />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <p class="eyebrow">Local browser tool</p>
+      <h1>Bulk Image to WebP Converter</h1>
+      <p class="subhead">Convert HEIC, HEIF, JPG, and JPEG files to WebP right in your browser. Your images are not uploaded anywhere.</p>
+    </section>
+
+    <section class="panel">
+      <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Choose images or drag and drop images here">
+        <div class="drop-icon">⬇</div>
+        <h2>Drop images here</h2>
+        <p>or click to choose files</p>
+        <input id="fileInput" type="file" multiple accept=".jpg,.jpeg,.heic,.heif,image/jpeg,image/heic,image/heif" />
+      </div>
+
+      <div class="settings">
+        <label>
+          WebP quality
+          <span id="qualityValue">82%</span>
+          <input id="qualityInput" type="range" min="40" max="100" value="82" />
+        </label>
+
+        <label>
+          Max width <span class="hint">optional</span>
+          <input id="maxWidthInput" type="number" min="1" placeholder="Keep original" />
+        </label>
+
+        <label class="checkbox-row">
+          <input id="keepFoldersInput" type="checkbox" checked />
+          <span>Keep folder structure when possible</span>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="convertButton" class="primary" disabled>Convert & Download ZIP</button>
+        <button id="clearButton" type="button" disabled>Clear</button>
+      </div>
+
+      <div class="progress-wrap" aria-live="polite">
+        <div class="progress-meta">
+          <span id="progressText">No files selected.</span>
+          <span id="progressCount"></span>
+        </div>
+        <div class="progress-bar" aria-hidden="true"><span id="progressFill"></span></div>
+      </div>
+    </section>
+
+    <section class="panel file-panel">
+      <div class="file-heading">
+        <h2>Files</h2>
+        <p id="fileSummary">Choose images to begin.</p>
+      </div>
+      <ul id="fileList" class="file-list"></ul>
+    </section>
+
+    <footer>
+      <p>Runs fully client-side. Best with Chrome, Edge, or Firefox. HEIC conversion may be slower for large batches.</p>
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
